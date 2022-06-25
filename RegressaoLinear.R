@@ -9,4 +9,4 @@ g = g * 2
 
 g
 
-tst_Candido = g^2
+TesteCandido = g^2
