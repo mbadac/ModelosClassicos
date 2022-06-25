@@ -1,0 +1,104 @@
+---
+title: "Aula 3"
+output: html_notebook
+---
+
+## Feature Engineering
+Feature engineering é o termo utilizado para definir um conjunto de técnicas utilizado na criação e manipulação de features (recursos), tendo como objetivo desenvolver um bom modelo de aprendizado de máquina.
+
+
+Essa é uma das fases mais importantes do processo de construção de um modelo preditivo. 
+
+O feature engineering é ainda mais relevante quando existem poucas instâncias dos dados, como é o caso em muitos estudos clínicos, já que predizer um resultado usando poucas instâncias que descrevem muitas características tende a resultar em overfitting.
+
+Feature engineering envolve vários processos: 
+
+ - *Seleção de feature* envolve a escolha de um conjunto de features de uma grande coleção. Selecionar os features importantes e reduzir o numero de features torna a computação em algoritmos de aprendizado de máquina e análise de dados mais viável. A seleção de features também melhora a qualidade da saída obtida dos algoritmos.
+
+ - *Transformação de feature* A transformação de features leva em consideração o tipo de dados e sua compatibilidade com o modelo e também se o tipo da variável passa a maior quantidade de informação possível.As técnicas de transformação de variável podem ajudar a normalizar dados distorcidos. Uma dessas transformações popularmente usadas é a transformação logarítmica. As transformações logarítmicas operam para comprimir os números maiores e expandir relativamente os números menores. 
+
+ - *Criação de feature* envolve a criando features usando dados existentes por meio de operações matemáticas. Por exemplo, para determinar o tipo de corpo de uma pessoa é necessário um recurso chamado IMC (Índice de Massa Corporal). Se o conjunto de dados capturar o peso e a altura da pessoa, o IMC pode ser derivado usando uma fórmula matemática. Criar novas features pode trazer à tona informações que são de extrema importância, mas não estavam explícitas nos dados. Por exemplo, podemos ter a data em que alguém começou a usar um serviço mas o que realmente precisamos é apenas do mês para entender se há alguma sazonalidade. A partir da feature data é possível criar uma nova contendo apenas o mês.
+
+ - *Extração de feature* é um processo de redução da dimensionalidade de um conjunto de dados. A extração de recursos envolve a combinação dos recursos existentes em novos, reduzindo assim o número de recursos no conjunto de dados. Isso reduz a quantidade de dados em tamanhos gerenciáveis para os algoritmos processarem, sem distorcer os relacionamentos originais ou informações relevantes.
+
+
+
+
+
+### Algumas técnicas de feature engineering
+
+#### 1) Imputação 
+A imputação lida com o tratamento de valores ausentes nos dados.Valores ausentes na base de dados podem ocorrer por vários motivos, como questões de permissões, erros humanos, erros de código, etc. A maioria dos algoritmos de aprendizado de máquina não aceitam conjuntos de dados com valores ausentes. Embora a exclusão de registros que não possuem determinados valores seja uma maneira de lidar com esse problema, também pode significar a perda de um pedaço de dados valiosos.É aqui que a imputação pode ajudar. A imputação é o processo de substituição de um valor ausente por um valor substituído.A imputação deve ser uma das primeiras etapas de feature engineering que você executa, pois afetará qualquer outro pré-processamento.
+
+
+Como fazer a imputação?
+
+*Estastistica estimada* 
+
+ - Imputação categórica: os valores categóricos ausentes geralmente são substituídos pelo valor mais comum em outros registros. o modo.
+ - Imputação Numérica: Os valores numéricos ausentes geralmente são substituídos pela média/mediana do valor correspondente em outros registros
+
+*Modelagem*
+
+ - KNN : K-vizinho mais próximo (KNN) imputa valores identificando observações com valores ausentes, identificando outras observações que são mais semelhantes com base em outros recursos disponíveis e usando os valores dessas observações do vizinho mais próximo para imputar valores ausentes.
+ - Tree based : as observações com valores ausentes são identificadas e o recurso que contém o valor ausente é tratado como o alvo e previsto usando árvores de decisão ensacadas.
+
+Há um consenso de que se uma feature tiver mais que 20% dos dados faltantes em sua coluna, é melhor não utilizá-la e entender porque esses valores estão faltando. Caso uma feature tenha até 20% dos valores faltando, preencher esses dados.E quando se tem menos de 2% dos dados de uma feature faltando, o mais indicado é deletar esses registros, pois como são poucos, sua base de dados não vai diminuir muito, além de poder causar outros problemas.
+
+
+#### 2) Manipulação de outliers 
+Outliers são valores excepcionalmente altos ou baixos no conjunto de dados que provavelmente não ocorrerão em cenários normais. Como esses valores discrepantes podem afetar negativamente sua previsão, eles devem ser tratados adequadamente. 
+
+Um valor é considerado um outlier quando a diferença dele para a média é maior que x * desvio padrão, ou quando os valores estão abaixo do primeiro quartil (Q1) ou acima do terceiro quartil (Q3) da distribuição de dados. Ao identificar um outlier é sempre identificar o motivo de ter ocorrido, pois ele pode ser uma boa oportunidade de negócio.
+
+Os vários métodos de tratamento de valores discrepantes incluem:
+
+ - Remoção: Os registros que contêm valores discrepantes são removidos da distribuição. No entanto, a presença de valores discrepantes em várias variáveis pode resultar na perda de uma grande parte da folha de dados com esse método.
+ - Substituindo valores: Os valores discrepantes podem alternativamente ser tratados como valores ausentes e substituídos usando imputação apropriada.
+ - Limitar: Limitar os valores máximo e mínimo e substituí-los por um valor arbitrário ou um valor de uma distribuição variável.
+
+
+#### 3) Filtering
+Muitos algoritmos (por exemplo, redes elásticas, florestas aleatórias e gradien boosting) se tornam extremamente demorados quanto mais preditores adicionamos. Assim,  filtrar ou reduzir features antes da modelagem pode acelerar significativamente o tempo de treinamento.
+
+Variáveis de variação zero, o que significa que o recurso contém apenas um único valor único, não fornece informações úteis para um modelo. Pode não ter nenhuma effeito em alguns algoritmos. No entanto, os features que têm variância próxima de zero também oferecem muito pouca ou nenhuma informação para um modelo.
+
+Uma regra prática para detectar características de variação próxima de zero é:
+
+ - A fração de valores únicos sobre o tamanho da amostra é baixa (≤ 10%).
+ - A razão entre a frequência do valor mais prevalente e a frequência do segundo valor mais prevalente é grande (≥ 20%).
+
+Se ambos os critérios forem verdadeiros, muitas vezes é vantajoso remover a variável do modelo.
+
+#### 4) Discretização ou Binning
+
+Essa técnica é geralmente utilizada em dados numéricos e tem objetivo de agrupar os dados em conjuntos ou intervalos de alguma forma lógica.Binning pode ser aplicado a valores categóricos. Isso pode ajudar a evitar o overfitting dos dados, mas tem o custo da perda de granularidade dos dados.
+
+Então é preciso fazer um balanço entre o quanto você vai perder de desempenho versus o quanto você vai reduzir de overfitting. Sem contar que você pode acabar perdendo muita informação nesse processo, então, novamente, é preciso conhecer muito a área de negócios para entender se o binning vai valer a pena.
+
+O agrupamento de dados pode ser feito da seguinte forma:
+
+- Agrupamento de intervalos iguais
+- Agrupamento com base em frequências iguais (de observações no compartimento)
+- Agrupamento baseado na ordenação da árvore de decisão (para estabelecer uma relação com o destino)
+
+
+#### 5) Scaling 
+
+O dimensionamento de recursos é feito devido à sensibilidade de alguns algoritmos de aprendizado de máquina à escala dos valores de entrada. Essa técnica de dimensionamento de recursos às vezes é chamada de normalização de recursos. Os processos de dimensionamento comumente usados incluem:
+
+ - Normalização ou Min-Max Scaling: Este processo envolve o reescalonamento de todos os valores em um feture no intervalo de 0 a 1. Em outras palavras, o valor mínimo no intervalo original terá o valor 0, o valor máximo terá 1 e o restante os valores entre os dois extremos serão dimensionados adequadamente.
+ - Padronização/variância: Todos os pontos de dados são subtraídos por sua média e o resultado dividido pela variância da distribuição para chegar a uma distribuição com média 0 e variância 1.
+
+Normalização é boa para usar quando você sabe que a distribuição de seus dados não segue uma distribuição gaussiana. Isso pode ser útil em algoritmos que não assumem nenhuma distribuição dos dados, como K-Vizinhos Mais Proxiomos e Neural Networks.
+Padronização, por outro lado, pode ser útil nos casos em que os dados seguem uma distribuição gaussiana. No entanto, isso não precisa ser necessariamente verdade. Além disso, ao contrário da normalização, padronização não possui um intervalo delimitador. Portanto, mesmo que você tenha valores discrepantes em seus dados, eles não serão afetados pela padronização.
+
+
+#### 7) Categorical encoding
+Categorical encoding é a técnica usada para codificar características categóricas em valores numéricos que geralmente são mais simples para um algoritmo entender. Os codificadores podem ser divididos em dois grupos principais:
+
+ - Codificadores Clássico e Contraste (Classic and Contrast encoders) :  Não usam as informações da variável dependente na codificação. Se houver k valores únicos em uma variável categórica, eles criam até k colunas distintas para armazenar a codificação dependendo da técnica. Exemplos incluem *One-Hot*, *Ordinal*, *Binary*, Hashing, Helmert, Backward difference
+ - Codificadores Bayesianos – Usam informações da variável dependente na codificação. Deve-se garantir que a codificação seja feita somente após dividir os dados em conjuntos de treinamento e teste e usar o destino do conjunto de treinamento. Esses codificadores sempre criam uma coluna para armazenar o valor codificado. Muitas vezes é recomendado adicionar algum “ruído” ao valor codificado resultante.Exemplos incluem *Target or Mean*, Leave one out, *Weight of evidence*, James-Stein, M-Estimator
+
+
+

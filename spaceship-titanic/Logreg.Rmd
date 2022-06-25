@@ -1,0 +1,171 @@
+---
+title: "Regressão Logistica"
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = "D:\\Downloads\\")
+
+# Helper packages
+library(dplyr)     # for data wrangling
+library(ggplot2)   # for awesome plotting
+library(rsample)   # for data splitting
+
+# Modeling packages
+library(caret)     # for logistic regression modeling
+library(mlbench)
+
+# Model interpretability packages
+library(vip)       # variable importance
+```
+
+## Base de dados para estudo
+```{r }
+dados = read.csv('default.csv', sep=';')
+```
+```{r }
+summary(dados)
+```
+
+```{r }
+plot(dados$glucose, diab$default)
+```
+  
+
+```{r }
+diab = na.omit(dados)
+```
+
+```{r }
+summary(diab)
+```
+
+```{r }
+pairs(diab)
+```
+
+##Fiting a simple model
+```{r}
+sim_model <- glm(diabetes ~ glucose, data = diab, family = binomial)
+summary(sim_model)
+```
+```{r}
+exp(sim_model$coefficients)
+```
+
+This indicate that one unit increase in the glucose concentration will increase the odds of being diabetes-positive by 1.04 times.
+
+```{r}
+confint(model1)
+```
+
+
+```{r}
+y.pred.prob <- predict(sim_model,type = "response")
+head(y.pred.prob)
+```
+
+
+```{r}
+contrasts(diab$diabetes)
+```
+```{r}
+y.pred.class <- ifelse(y.pred.prob > 0.5, "pos", "neg")
+head(y.pred.class)
+```
+
+
+
+```{r}
+set.seed(123)
+cv_model1 <- train(
+  diabetes ~ glucose, 
+  data = diab, 
+  method = "glm",
+  family = "binomial",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+set.seed(123)
+cv_model2 <- train(
+  diabetes ~ glucose + pressure, 
+  data = diab, 
+  method = "glm",
+  family = "binomial",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+set.seed(123)
+cv_model3 <- train(
+  diabetes ~ ., 
+  data = diab, 
+  method = "glm",
+  family = "binomial",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+
+```
+```{r}
+# extract out of sample performance measures
+summary(
+  resamples(
+    list(
+      model1 = cv_model1, 
+      model2 = cv_model2, 
+      model3 = cv_model3
+    )
+  )
+)$statistics$Accuracy
+
+```
+```{r}
+# predict class
+pred_class <- predict(cv_model3, diab)
+
+# create confusion matrix
+confusionMatrix(
+  data = pred_class, 
+  reference = diab$diabetes
+)
+
+```
+
+```{r}
+# predict class
+pred_class <- predict(cv_model3, diab)
+
+# create confusion matrix
+confusionMatrix(
+  data = relevel(pred_class, ref = "pos"), 
+  reference = relevel(diab$diabetes, ref = "pos")
+)
+
+```
+
+No Information Rate: 0.6684. This represents the ratio of non-diabetic vs. diabetic in our training data. Consequently, if we simply predicted "Neg" for every patient we would still get an accuracy rate of 66.84%.
+
+
+```{r}
+library(ROCR)
+
+# Compute predicted probabilities
+m1_prob <- predict(cv_model1, diab, type = "prob")$pos
+m3_prob <- predict(cv_model3, diab, type = "prob")$pos
+
+# Compute AUC metrics for cv_model1 and cv_model3
+perf1 <- prediction(m1_prob, diab$diabetes) %>%
+  performance(measure = "tpr", x.measure = "fpr")
+perf2 <- prediction(m3_prob, diab$diabetes) %>%
+  performance(measure = "tpr", x.measure = "fpr")
+
+# Plot ROC curves for cv_model1 and cv_model3
+plot(perf1, col = "black", lty = 2)
+plot(perf2, add = TRUE, col = "blue")
+legend(0.8, 0.2, legend = c("cv_model1", "cv_model3"),
+       col = c("black", "blue"), lty = 2:1, cex = 0.6)
+
+```
