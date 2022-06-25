@@ -1,0 +1,306 @@
+---
+title: "Projeto - Sistemas Clássicos de ML"
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = "D:\\Downloads\\BSBr MBA DS\\DS\\06 Modelos Clássicos\\Projeto\\house-prices-regression\\")
+
+# Helper packages
+library(dplyr)    
+library(ggplot2)  
+library(visdat)   
+library(GGally)
+library(plotly)
+library(ggcorrplot)
+library(reshape2)
+
+# Feature engineering packages
+library(caret)    # for various ML tasks
+library(recipes)  # for feature engineering tasks
+
+# Model interpretability packages
+library(vip)      # variable importance
+
+```
+
+### carregando Dados
+```{r }
+dados = read.csv('train.csv', header = TRUE, sep=',')
+
+dados
+```
+
+### EDA
+```{r }
+dim(dados)
+# 1460 registros para 81 colunas (80 independentes + 1 dependente)
+```
+
+```{r }
+glimpse(advert)
+```
+
+
+
+
+```{r }
+head(advert)
+```
+```{r}
+# Checking Missing Values
+table(is.na(advert))
+```
+
+
+```{r}
+# Checking Outliers
+boxplot(advert)
+```
+
+
+```{r }
+# Removing Outliers
+advert <- advert[-which(advert$Newspaper %in% boxplot.stats(advert$Newspaper)$out), ]
+```
+
+```{r }
+# Vi
+ggpairs(advert)
+```
+
+```{r }
+# create corr matrix and
+# coressponding p-value matrix
+corr_mat <- round(cor(advert),2)
+p_mat <- cor_pmat(advert)
+
+# plotting the interactive corr heatmap
+corr_mat <- ggcorrplot(
+  corr_mat, hc.order = TRUE, type = "lower",
+  outline.col = "white",
+  p.mat = p_mat
+)
+
+ggplotly(corr_mat)
+```
+
+
+```{r }
+# creating correlation matrix
+corr_mat <- round(cor(PimaIndiansDiabetes[,1:8]),2)
+
+# reduce the size of correlation matrix
+melted_corr_mat <- melt(corr_mat)
+# head(melted_corr_mat)
+
+# plotting the correlation heatmap
+ggplot(data = melted_corr_mat, aes(x=Var1, y=Var2,fill=value)) +
+  geom_tile()+
+  geom_text(aes(Var2, Var1, label = value),
+            color = "black", size = 4)
+```
+
+```{r }
+set.seed(123)  # for reproducibility
+index <- createDataPartition(advert$Sales, p = 0.7, 
+                               list = FALSE)
+train <- advert[index, ]
+test  <- advert[-index, ]
+```
+
+
+
+### Modeling
+#### Simples
+```{r}
+#define intercept-only model
+sreg <- lm(Sales ~ TV , data = train)
+summary(sreg)
+```
+```{r}
+####Diagnostic plot
+plot(mod1)
+```
+
+
+#### Multipla
+```{r}
+#define intercept-only model
+intercept_only <- lm(Sales ~ 1, data=train)
+
+#define model with all predictors
+all <- lm(Sales ~ ., data=train)
+
+#perform backward stepwise regression
+backward <- stats::step(all, direction='backward', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+backward$anova
+
+```
+```{r}
+backward$coefficients
+```
+
+```{r}
+#define intercept-only model
+intercept_only <- lm(Sales ~ 1, data=train)
+
+#define model with all predictors
+all <- lm(Sales ~ ., data=train)
+
+#perform forward stepwise regression
+forward <- stats::step(intercept_only, direction='forward', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+forward$anova
+
+```
+```{r}
+forward$coefficients
+```
+
+```{r}
+#define intercept-only model
+intercept_only <- lm(Sales ~ 1, data=train)
+
+#define model with all predictors
+all <- lm(Sales ~ ., data=train)
+
+#perform both-direction stepwise regression
+both <- stats::step(intercept_only, direction='both', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+both$anova
+
+```
+```{r}
+both$coefficients
+``` 
+
+```{r}
+mreg <- lm(Sales ~ TV + Radio, data = train)
+summary(mreg)
+```
+```{r}
+# Performing ANOVA to test the above stated null hypothesis
+anova(mod1 , mr)
+```
+```{r}
+# diagonostic
+plot(mr)
+```
+
+```{r}
+# Checking effect of Auto-correlation
+durbinWatsonTest(mr)
+```
+```{r}
+# Checking Normality of Errors
+shapiro.test(mr$residuals)
+```
+```{r}
+# Checking effect of Auto-correlation
+durbinWatsonTest(mr)
+```
+
+```{r}
+# Plotting Histogram for Residuals
+hist(mm1$residuals)
+```
+
+```{r}
+# Detecting Multicolinearity (As a rule of thumb, VIF greater than 5 or 10 represents Multicolinearity.)
+vif(mm1)
+```
+
+#### Polinomial
+```{r}
+# Fitting second order orthogonal polynomial model in two variables to avoid multicolinearity
+preg <- lm(Sales ~ poly(TV , 2) + poly(Radio , 2) + TV:Radio  , data = train)
+
+# Take a look on summary of the model
+summary(pr1)
+```
+
+```{r}
+# Performing ANOVA to test the above stated null hypothesis
+anova(mr , pr1)
+```
+
+
+
+### ML
+```{r}
+# Specify resampling plan
+cv <- trainControl(
+  method = "repeatedcv", 
+  number = 10, 
+  repeats = 5
+)
+
+```
+
+
+```{r}
+set.seed(123)  # for reproducibility
+sim_model <- train(
+  form = Sales ~ TV, 
+  data = train, 
+  method = "lm",
+  trControl = cv,
+  preProcess = c("center", "scale")
+)
+
+
+set.seed(123)  # for reproducibility
+mul_model <- train(
+  form = Sales ~ TV + Radio, 
+  data = train, 
+  method = "lm",
+  trControl = cv,
+  preProcess = c("center", "scale")
+)
+
+set.seed(123)  # for reproducibility
+poli_model <- train(
+  form = Sales ~ poly(TV , 2) + poly(Radio , 2) + TV:Radio, 
+  data = train, 
+  method = "lm",
+  trControl = cv,
+  preProcess = c("center", "scale")
+)
+```
+
+
+#### Evaluation
+```{r }
+# Extract out of sample performance measures
+summary(resamples(list(
+  model1 = sim_model, 
+  model2 = mul_model,
+  model3 = poli_model
+)))
+```
+
+```{r}
+vip(poli_model, num_features = 5, method = "model")
+```
+
+#### Prediction
+```{r}
+prediction = poli_model %>% predict(test)
+
+```
+
+```{r}
+data.frame(R2 = R2(prediction, test$Sales),
+            RMSE = RMSE(prediction, test$Sales),
+            MAE = MAE(prediction, test$Sales))
+```
+
+
