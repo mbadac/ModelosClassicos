@@ -8,3 +8,5 @@ g = c*d
 g = g * 2
 
 g
+
+tst_Candido = g^2
