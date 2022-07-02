@@ -1,0 +1,180 @@
+---
+title: "Feature engineering"
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Helper packages
+library(dplyr)    # for data manipulation
+library(ggplot2)  # for awesome graphics
+library(visdat)   # for additional visualizations
+library(GGally)
+
+# Feature engineering packages
+library(caret)    # for various ML tasks
+library(recipes)  # for feature engineering tasks
+
+# Model interpretability packages
+library(vip)      # variable importance
+
+```
+
+#### carregando Dados
+```{r }
+ames <- AmesHousing::make_ames()
+```
+
+```{r }
+dim(ames)
+```
+
+```{r }
+glimpse(ames)
+```
+
+
+```{r }
+set.seed(123)  # for reproducibility
+index <- createDataPartition(ames$Sale_Price, p = 0.7, 
+                               list = FALSE)
+train <- ames[index, ]
+test  <- ames[-index, ]
+```
+#### Feature Engineering
+```{r}
+blueprint <- recipe(Sale_Price ~ ., data = train) %>%
+  step_nzv(all_nominal())  %>% #Remove near-zero variance features that are categorical (aka nominal)
+  step_integer(matches("Qual|Cond|QC|Qu")) %>% #Ordinal encode our quality-based features (which are inherently ordinal)
+  step_center(all_numeric(), -all_outcomes()) %>%
+  step_scale(all_numeric(), -all_outcomes()) %>%
+  step_pca(all_numeric(), -all_outcomes())%>%
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE)
+```
+
+```{r}
+blueprint3 <- recipe(Sale_Price ~ ., data = train[,77:79]) %>%
+  step_nzv(all_nominal())  %>% #Remove near-zero variance features that are categorical (aka nominal)
+  step_center(all_numeric(), -all_outcomes()) %>%
+  step_scale(all_numeric(), -all_outcomes()) %>%
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE)
+```
+
+
+```{r}
+prepare <- prep(blueprint2, training = train)
+baked_train <- bake(prepare, new_data = tr)
+baked_test <- bake(prepare, new_data = test)
+```
+
+
+
+```{r}
+blueprint2 <- recipe(Sale_Price ~ ., data = train) %>%
+  step_nzv(all_nominal()) %>%
+  step_integer(matches("Qual|Cond|QC|Qu")) %>%
+  step_center(all_numeric(), -all_outcomes()) %>%
+  step_scale(all_numeric(), -all_outcomes()) %>%
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE)
+```
+
+
+#### Modeling
+```{r}
+#define intercept-only model
+intercept_only <- lm(Sale_Price ~ 1, data=train)
+
+#define model with all predictors
+all <- lm(Sale_Price ~ ., data=train)
+
+#perform backward stepwise regression
+backward <- stats::step(all, direction='backward', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+backward$anova
+
+```
+```{r}
+#define intercept-only model
+intercept_only <- lm(Sale_Price ~ 1, data=train)
+
+#define model with all predictors
+all <- lm(Sale_Price ~ ., data=train)
+
+#perform forward stepwise regression
+backward <- stats::step(intercept_only, direction='foward', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+backward$anova
+
+```
+
+```{r}
+#define intercept-only model
+intercept_only <- lm(Sale_Price ~ 1, data=train)
+
+#define model with all predictors
+all <- lm(Sale_Price ~ ., data=train)
+
+#perform both-direction stepwise regression
+backward <- stats::step(intercept_only, direction='both', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+backward$anova
+
+```
+
+
+
+
+
+```{r}
+# Specify resampling plan
+cv <- trainControl(
+  method = "repeatedcv", 
+  number = 10, 
+  repeats = 5
+)
+
+```
+
+
+
+```{r}
+set.seed(123)  # for reproducibility
+lin_model1 <- train(
+  form = Sale_Price ~ ., 
+  data = train[,77:79], 
+  method = "lm",
+  trControl = cv,
+  preProcess = "dummy"
+)
+
+
+set.seed(123)  # for reproducibility
+lin_model2 <- train(
+  form = Sale_Price ~ ., 
+  data = train[,77:79], 
+  method = "lm",
+  trControl = cv
+)
+```
+
+
+
+#### Evaluation
+```{r}
+# Extract out of sample performance measures
+summary(resamples(list(
+  model1 = lin_model1, 
+  model2 = lin_model2
+)))
+```
+
+```{r}
+vip(lin_model1, num_features = 20, method = "model")
+
+```
+
+

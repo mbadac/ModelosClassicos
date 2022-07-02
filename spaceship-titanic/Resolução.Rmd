@@ -1,0 +1,370 @@
+---
+title: "Regressão Logistica - Spaceship Titanic"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = "D:\\Downloads\\BSBr MBA DS\\DS\\06 Modelos Clássicos\\Projeto\\spaceship-titanic") #Dani
+
+# Helper packages
+library(dplyr)     # for data wrangling
+library(ggplot2)   # for awesome plotting
+library(rsample)   # for data splitting
+library(tidyverse)
+library(ggcorrplot)
+
+# Modeling packages
+library(caret)     # for logistic regression modeling
+library(mlbench)
+
+# Model interpretability packages
+library(vip)       # variable importance
+```
+
+# Base de dados para estudo
+```{r }
+dados = read.csv('train.csv', sep=',')
+
+head(dados)
+```
+
+# Análise Exploratória - Geral
+```{r }
+
+```
+
+# Análise Exploratória - Geral
+```{r }
+summary(dados)
+
+dadosComNulos = dados[!complete.cases(dados),]
+head(dadosComNulos)
+#1073 observações contém dados nulos, ainda não serão removidas para análise individual
+```
+
+## Análise Exploratória - PassengerId
+```{r }
+# PassengerId - A unique Id for each passenger. Each Id takes the form gggg_pp where gggg indicates a group the passenger is travelling with and pp is their number within the group. People in a group are often family members, but not always.
+
+summary(dados$PassengerId) # Campo de tipo character
+
+dupData = dados[duplicated(dados$PassengerId)]
+dupData # não existem linhas duplicadas
+
+head(dados$PassengerId) # Verificado formato gggg_pp
+
+# Separação dos campos
+PassengerId_temp = dados$PassengerId %>% str_split(pattern="_", simplify=TRUE)
+dados$PassengerId_Group = PassengerId_temp[, 1] %>% as.integer()
+dados$PassengerId_Num = PassengerId_temp[, 2] %>% as.integer()
+
+# PassengerId_Group
+summary(dados$PassengerId_Group) #Valores inteiros variando de 1 a 9280
+
+# PassengerId_Num
+counts = table(dados$PassengerId_Num)
+#   1    2    3    4    5    6    7    8 
+# 6217 1412  571  231  128   75   46   13 
+counts
+
+barplot(counts, mais="Campo", xlab="Campo")
+
+#Drop do campo PassengerId completo
+dados = dados[, !colnames(all) %in% c("PassengerId")]
+
+```
+
+## Análise Exploratória - HomePlanet
+```{r }
+# HomePlanet - The planet the passenger departed from, typically their planet of permanent residence.
+
+summary(dados$HomePlanet) #Campo de tipo character
+
+head(dados$HomePlanet) 
+
+unique(dados$HomePlanet) # 4 valores possíveis: "Europa" "Earth"  "Mars" ""
+
+counts = table(dados$HomePlanet)
+# "" - 201    
+# Earth - 4602
+# Europa - 2131
+# Mars - 1759
+counts
+
+
+barplot(counts, xlab="Campo")
+
+```
+
+201 registros sem planeta de origem, com prevalência para Earth. Devido ao número de opções e falta de hierarquia entre elas, candidato a one-hot encoding.
+
+## Análise Exploratória - CryoSleep
+```{r }
+# CryoSleep - Indicates whether the passenger elected to be put into suspended animation for the duration of the voyage. Passengers in cryosleep are confined to their cabins.
+
+summary(dados$CryoSleep) # Campo de tipo character
+
+head(dados$CryoSleep)
+
+unique(dados$CryoSleep) # 3 valores possíveis, "" "True" "False" 
+
+counts = table(dados$CryoSleep)
+# "" - 217
+# False - 5439
+# True - 3037
+counts
+
+barplot(counts, xlab="Valor")
+```
+
+## Análise Exploratória - Cabin
+```{r }
+# Cabin - The cabin number where the passenger is staying. Takes the form deck/num/side, where side can be either P for Port or S for Starboard.
+
+summary(dados$Cabin) # Campo de tipo character
+
+head(dados$Cabin) # Verificada a estrutura do conteúdo
+
+# Separação dos campos
+cabin_temp = dados$Cabin %>% str_split(pattern="/", simplify=TRUE)
+dados$Cabin_Deck = cabin_temp[, 1] %>% as.factor()
+dados$Cabin_Num = cabin_temp[, 2] %>% as.integer()
+dados$Cabin_Side = cabin_temp[, 3] %>% str_replace(pattern="P", replace="Port") %>% str_replace(pattern="S", replace="StarBoard") %>% as.factor()
+
+# Valores possíveis: A B C D E F G T
+unique(dados$Cabin_Deck)
+counts = table(dados$Cabin_Deck)
+# NA - 199
+# A - 256
+# B - 779
+# C - 747
+# D - 478
+# E - 876
+# F - 2794
+# G - 2559
+# T - 5
+counts
+
+barplot(counts, mais="Campo", xlab="Valor")
+
+# Números de 0 a 1894, com 199 nulos
+summary(dados$Cabin_Num)
+unique(dados$Cabin_Num)
+
+# Valores possíveis: Port StarBoard
+unique(dados$Cabin_Side)
+counts = table(dados$Cabin_Side)
+# NA - 199
+# Port - 4206
+# StarBoard - 4288
+counts
+barplot(counts, mais="Campo", xlab="Valor")
+
+#Drop do campo Cabin completo
+dados = dados[, !colnames(dados) %in% c("Cabin")]
+```
+
+## Análise Exploratória - Destination
+```{r }
+# Destination - The planet the passenger will be debarking to.
+
+summary(dados$Destination) # Campo de tipo character
+
+head(dados$Destination)
+
+unique(dados$Destination) # 4 valores possíveis "TRAPPIST-1e"   "PSO J318.5-22" "55 Cancri e" ""  
+
+# Substituição dos valores por algo mais fácil de lidar
+dados[dados$Destination == "PSO J318.5-22",]$Destination =  "P"
+dados[dados$Destination == "55 Cancri e",]$Destination =  "C"
+dados[dados$Destination == "TRAPPIST-1e",]$Destination =  "T"
+
+summary(dados$Destination)
+
+dados$Destination = factor(dados$Destination)
+
+# dados = dados %>% mutate(Destination_New = case_when( Destination == "PSO J318.5-22" ~ "P",
+# Destination == "55 Cancri e" ~ "C",
+# Destination == "TRAPPIST-1e" ~ "T",
+# ))
+
+counts = table(dados$Destination)
+#      ""       55 Cancri e PSO J318.5-22   TRAPPIST-1e 
+#      182          1800           796          5915 
+counts
+
+barplot(counts, mais="Campo", xlab="Valor")
+```
+
+## Análise Exploratória - Age
+```{r }
+# Age - The age of the passenger.
+
+summary(dados$Age) # de 0 a 79, com 179 nulos
+
+head(dados$Age)
+
+counts = table(dados$Age)
+barplot(counts, mais="Campo", xlab="Valor")
+
+# Substituição dos nulos pela média das idades
+dados$Age = dados$Age %>% replace_na(mean(dados$Age, na.rm=TRUE))
+
+summary(dados$Age) # de 0 a 79, sem nulos
+
+counts = table(dados$Age)
+barplot(counts, mais="Campo", xlab="Valor")
+```
+
+## Análise Exploratória - VIP
+```{r }
+# VIP - Whether the passenger has paid for special VIP service during the voyage.
+
+summary(dados$VIP)
+
+head(dados$VIP)
+
+unique(dados$VIP)
+
+counts = table(dados$VIP)
+counts
+barplot(counts, mais="Campo", xlab="Valor")
+```
+
+## Análise Exploratória - RoomService
+```{r }
+# RoomService, FoodCourt, ShoppingMall, Spa, VRDeck - Amount the passenger has billed at each of the Spaceship Titanic's many luxury amenities.
+summary(dados$RoomService) #Valor de 0 a 14327, com 181 nulos
+
+head(dados$RoomService)
+
+# Substituição dos nulos por 0
+dados$RoomService = dados$RoomService %>% replace_na(0)
+```
+
+## Análise Exploratória - FoodCourt
+```{r }
+# RoomService, FoodCourt, ShoppingMall, Spa, VRDeck - Amount the passenger has billed at each of the Spaceship Titanic's many luxury amenities.
+summary(dados$FoodCourt) # Valores de 0 a 29813, com 183 nulos
+
+head(dados$FoodCourt)
+
+# Substituição dos nulos por 0
+dados$FoodCourt = dados$FoodCourt %>% replace_na(0)
+```
+
+## Análise Exploratória - ShoppingMall
+```{r }
+# RoomService, FoodCourt, ShoppingMall, Spa, VRDeck - Amount the passenger has billed at each of the Spaceship Titanic's many luxury amenities.
+summary(dados$ShoppingMall) # Valores de 0 a 23492, com 208 nulos
+
+head(dados$ShoppingMall)
+
+# Substituição dos nulos por 0
+dados$ShoppingMall = dados$ShoppingMall %>% replace_na(0)
+```
+
+## Análise Exploratória - Spa
+```{r }
+summary(dados$Spa) # Valores de 0 a 22408, com 183 nulos
+
+head(dados$Spa)
+
+# Substituição dos nulos por 0
+dados$Spa = dados$Spa %>% replace_na(0)
+```
+
+## Análise Exploratória - VRDeck
+```{r }
+# RoomService, FoodCourt, ShoppingMall, Spa, VRDeck - Amount the passenger has billed at each of the Spaceship Titanic's many luxury amenities.
+summary(dados$VRDeck) # Valores de 0 a 22133, com 188 nulos
+
+head(dados$VRDeck)
+
+# Substituição dos nulos por 0
+dados$VRDeck = dados$VRDeck %>% replace_na(0)
+
+```
+
+## Análise Exploratória - Name
+```{r }
+# Name - The first and last names of the passenger.
+summary(dados$Name)  #Campo de tipo character
+
+head(dados$Name) # Os nomes são campos exclusivos de cada passageiro
+
+dados = dados[, !colnames(dados) %in% c("Name")]
+```
+
+## Análise Exploratória - Transported
+```{r }
+# Transported - Whether the passenger was transported to another dimension. This is the target, the column you are trying to predict.
+
+summary(dados$Transported)
+
+head(dados$Transported)
+
+unique(dados$Transported)
+
+counts = table(dados$Transported)
+counts
+barplot(counts, mais="Campo", xlab="Valor")
+```
+
+## Validação dos nulos
+```{r }
+encoder = dummyVars(~ HomePlanet + Destination + Cabin_Deck + Cabin_Side, data=dados, sep="") 
+dados = predict(encoder, newdata=dados)
+colnames(dados)[5:8] = c("Destination", "DestinationC", "DestinationP", "DestinationT")
+dados.dummy %>% head(3)
+
+```
+
+## Validação dos nulos
+```{r }
+train_na = apply(all[!is.na(all$Transported),], MARGIN=2, function(x){sum(is.na(x))})
+test_na = apply(all[is.na(all$Transported),], MARGIN=2, function(x){sum(is.na(x))})
+temp = matrix(c(train_na, test_na), nrow=length(train_na), dimnames=list(names(train_na)))
+data.frame(Data=c("TRAIN", "TEST"), t(temp))
+
+```
+
+## Matriz de Correlação
+```{r }
+options(repr.plot.width=10, repr.plot.height=10)
+ggcorrplot(cor(train), hc.order=TRUE, outline.col="white", type="lower", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726"))
+
+```
+
+## Modelo
+```{r }
+nfold = 4
+set.seed(0)
+cv.idx = split(sample(1:nrow(train)), 1:nfold)
+str(cv.idx)
+
+```
+
+## Análise dos resultados
+```{r }
+
+
+```
+
+### Verificação dos coeficientes
+```{r }
+
+
+```
+
+## Salvamento do resultado
+```{r }
+sub = read.csv("../input/spaceship-titanic/sample_submission.csv")
+sub$Transported = sapply(pred, FUN=function(x){if (x==1){"True"} else {"False"}})
+write.csv(sub, "submission.csv", row.names=FALSE)
+sub %>% head(3)
+
+```
