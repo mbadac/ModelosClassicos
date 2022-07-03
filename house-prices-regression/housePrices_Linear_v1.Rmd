@@ -1,0 +1,270 @@
+
+---
+title: "Modelo Classico - Regressão Linear"
+output: pdf_document
+date: '2022-07-02'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Preprocess and visualization packages
+library(tidyverse)
+library(dplyr)     # for data manipulation
+library(ggplot2)   # for awesome graphics
+
+# Modeling process packages
+library(rsample)    # for resampling procedures
+library(caret)     # for resampling and model training
+library(caTools)
+
+```
+
+## REGRESSAO LINEAR SIMPLES
+
+```{r}
+#### Importing the dataset
+dtTrain = read.csv('train.csv', header = TRUE, sep=',')
+dtTrain
+```
+
+```{r}
+summary(dtTrain)
+```
+
+```{r}
+glimpse(dtTrain)
+```
+```{r}
+head(dtTrain)
+```
+
+```{r}
+#### dimensions of dataset
+dim(dtTrain)
+```
+```{r}
+# Checking Missing Values
+table(is.na(dtTrain))
+
+```
+```{r}
+# Checking Outliers
+boxplot(dtTrain)
+```
+
+```{r}
+#### list types for each attribute
+sapply(dtTrain, class)
+```
+
+```{r}
+#### initial plot
+plot(dtTrain$SalePrice, as.factor(dtTrain$MSZoning))
+```
+
+```{r}
+#### regression model
+model1 = lm(formula = Salary ~ YearsExperience,data = dataset)
+```
+
+```{r}
+#### outputs
+summary(model1)
+
+sigma(model1)    # RMSE
+sigma(model1)^2  # MSE
+
+confint(model1, level = 0.95)
+```
+
+```{r}
+# Visualising the results
+ggplot() +
+  geom_point(aes(x = dataset$YearsExperience, y = dataset$Salary),
+             colour = 'red') +
+  geom_line(aes(x = dataset$YearsExperience, y = predict(model1, newdata = dataset)),
+            colour = 'blue') +
+  ggtitle('Salary vs Experience') +
+  xlab('Years of experience') +
+  ylab('Salary')
+
+```
+
+
+
+
+
+## REGRESSAO LINEAR MULTIPLA
+```{r}
+## Importing the dataset
+dataset = read.csv('50_Startups.csv')
+
+
+# Fitting Multiple Linear Regression to the Training set
+regressor = lm(formula = Profit ~ .,
+               data = dataset)
+
+summary(regressor)
+```
+
+
+## REGRESSAO LINEAR POLINOMIAL
+```{r}
+# Importing the dataset
+dataset = read.csv('Position_Salaries.csv')
+dataset = dataset[2:3]
+
+
+plot(dataset$Level, dataset$Salary)
+
+# Fitting Linear Regression to the dataset
+lin_reg = lm(formula = Salary ~ .,
+             data = dataset)
+summary(lin_reg)
+
+# Visualising the Linear Regression results
+library(ggplot2)
+ggplot() +
+  geom_point(aes(x = dataset$Level, y = dataset$Salary),
+             colour = 'red') +
+  geom_line(aes(x = dataset$Level, y = predict(lin_reg, newdata = dataset)),
+            colour = 'blue') +
+  ggtitle('Regressao linear simples') +
+  xlab('Nivel') +
+  ylab('Salario')
+```
+
+
+```{r}
+# Fitting Polynomial Regression to the dataset
+dataset$Level2 = dataset$Level^2
+dataset$Level3 = dataset$Level^3
+dataset$Level4 = dataset$Level^4
+poly_reg = lm(formula = Salary ~ .,
+              data = dataset)
+summary(poly_reg)
+
+
+# Visualising the Polynomial Regression results
+ggplot() +
+  geom_point(aes(x = dataset$Level, y = dataset$Salary),
+             colour = 'red') +
+  geom_line(aes(x = dataset$Level, y = predict(poly_reg, newdata = dataset)),
+            colour = 'blue') +
+  ggtitle('Regressao polinomial') +
+ xlab('Nivel') +
+  ylab('Salario')
+
+# Visualising the Regression Model results (for higher resolution and smoother curve)
+x_grid = seq(min(dataset$Level), max(dataset$Level), 0.1)
+ggplot() +
+  geom_point(aes(x = dataset$Level, y = dataset$Salary),
+             colour = 'red') +
+  geom_line(aes(x = x_grid, y = predict(poly_reg,
+                                        newdata = data.frame(Level = x_grid,
+                                                             Level2 = x_grid^2,
+                                                             Level3 = x_grid^3,
+                                                             Level4 = x_grid^4))),
+            colour = 'blue') +
+  ggtitle('Regressao polinomial') +
+  xlab('Nivel') +
+  ylab('Salario')
+
+```
+
+## MACHINE LEARNING
+### Carregando dados do Ames housing que esta no pacote de AmesHousing em R
+```{r}
+# Ames housing data
+ames <- AmesHousing::make_ames()
+
+#summary(ames)
+```
+
+### Divisao de dados - Random sampling
+
+```{r}
+# Using base R
+set.seed(123)  # for reproducibility
+index_1 <- sample(1:nrow(ames), round(nrow(ames) * 0.7))
+train_1 <- ames[index_1, ]
+test_1  <- ames[-index_1, ]
+
+# Using caret package
+set.seed(123)  # for reproducibility
+index_2 <- createDataPartition(ames$Sale_Price, p = 0.7, 
+                               list = FALSE)
+train_2 <- ames[index_2, ]
+test_2  <- ames[-index_2, ]
+
+# Using rsample package
+set.seed(123)  # for reproducibility
+split_1  <- initial_split(ames, prop = 0.7)
+train_3  <- training(split_1)
+test_3   <- testing(split_1)
+
+#Usinf caTools package
+set.seed(123)
+split = sample.split(ames$Sale_Price, SplitRatio = 0.8)
+training_set = subset(ames, split == TRUE)
+test_set = subset(ames, split == FALSE)
+
+```
+
+### Divisao de dados - Stratified sampling
+
+```{r}
+#  with the rsample package
+set.seed(123)
+split <- initial_split(ames, prop = 0.7, 
+                       strata = "Sale_Price")
+ames_train  <- training(split)
+ames_test   <- testing(split)
+
+```
+
+
+
+### Treinando modelo linear com 10-fold cross-validation usando biblioteca caret
+
+
+```{r}
+
+# model 1 CV
+set.seed(123)  # for reproducibility
+cv_model1 <- train(
+  form = Sale_Price ~ Gr_Liv_Area, 
+  data = ames_train, 
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+
+# model 2 CV
+set.seed(123)
+cv_model2 <- train(
+  Sale_Price ~ Gr_Liv_Area + Year_Built, 
+  data = ames_train, 
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+# model 3 CV
+set.seed(123)
+cv_model3 <- train(
+  Sale_Price ~ ., 
+  data = ames_train, 
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+```
+
+### Comparando modelos
+```{r}
+summary(resamples(list(
+  model1 = cv_model1, 
+  model2 = cv_model2, 
+  model3 = cv_model3
+)))
+```
