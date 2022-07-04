@@ -24,7 +24,7 @@ library(caTools)
 ```{r}
 #### Importing the dataset
 dtTrain = read.csv('train.csv', header = TRUE, sep=',')
-dtTrain
+dtTest = read.csv('test.csv', header = TRUE, sep=',')
 ```
 
 ```{r}
@@ -33,7 +33,9 @@ summary(dtTrain)
 
 ```{r}
 glimpse(dtTrain)
+
 ```
+
 ```{r}
 head(dtTrain)
 ```
@@ -41,13 +43,15 @@ head(dtTrain)
 ```{r}
 #### dimensions of dataset
 dim(dtTrain)
+
 ```
+
 ```{r}
-# Checking Missing Values
-(sapply(dtTrain, function(x) sum(is.na(x)))/1460)*100
+# Checking Missing Values - Mais que 50% de NA
+
+((sapply(dtTrain, function(x) sum(is.na(x)))/dim(dtTrain)[1])*100>50)
+
 ```
-
-
 
 ```{r}
 # Checking Outliers
@@ -65,6 +69,10 @@ sapply(dtTrain, class)
 #### initial plot
 plot(dtTrain$SalePrice, as.factor(dtTrain$MSZoning))
 ```
+```{r}
+
+```
+
 
 ```{r}
 #### regression model
