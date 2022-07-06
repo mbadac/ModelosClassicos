@@ -24,7 +24,7 @@ library(mlr3)
 
 ## R Markdown
 
-Carregando e tratando os dados0 
+Carregando e tratando os dados 
 ```{r houses data base treatment}
 ## Importando o Dataset
 dataset = read.csv('train.csv')
@@ -76,9 +76,11 @@ head(dados)
 ```
 
 ```{r create corr matrix and coressponding p-value matrix}
+dados2 <- subset(dados, select = c(LotArea, OverallQual, YearBuilt, YearRemodAdd,  FullBath, HalfBath,  BedroomAbvGr, KitchenAbvGr, GarageCars, Pool, MiscVal, SalePrice, area))
 
-corr_mat <- round(cor(dados),2)
-p_mat <- cor_pmat(dados)
+
+corr_mat <- round(cor(dados2),2)
+p_mat <- cor_pmat(dados2)
 
 # plotting the interactive corr heatmap
 corr_mat <- ggcorrplot(
