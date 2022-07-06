@@ -1,0 +1,172 @@
+---
+title: "housePricesNordin_V01"
+author: "Alexandre Nordin"
+date: '2022-07-05'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(dplyr)     # for data manipulation
+library(ggplot2)   # for awesome graphics
+library(ggcorrplot)
+library(plotly)
+library(reshape2)
+
+# Modeling process packages
+library(rsample)    # for resampling procedures
+library(caret)     # for resampling and model training
+library(caTools)
+library(mlr3)
+```
+
+## R Markdown
+
+Carregando e tratando os dados0 
+```{r houses data base treatment}
+## Importando o Dataset
+dataset = read.csv('train.csv')
+
+
+##Inspecionando as variáveis
+head(dataset)
+
+## Eliminando as variáveis não selecionadas
+dados <- subset(dataset, select = c(MSZoning, LotArea, Neighborhood, OverallQual, YearBuilt, YearRemodAdd,  FullBath, HalfBath,  BedroomAbvGr, KitchenAbvGr, GarageCars, PoolArea, MiscVal, SalePrice, firstFlrSF, secondFlrSF))
+
+head(dados)
+
+##Criando campos Agregados
+dados["area"]<-dados$firstFlrSF + dados$secondFlrSF
+
+##Eliminando as vairáveis de 1 e 2 ANDAR
+dados$firstFlrSF<- NULL
+dados$secondFlrSF<-NULL
+
+##Criando a variável de Piscina
+dados$Pool = as.numeric(dados$PoolArea > 0);
+dados$PoolArea<-NULL
+
+##Criando as varáveis Dummy para as variáveis MSZoning e Bairro
+
+dummy = dummyVars(~ MSZoning + Neighborhood, data=dados, sep="") 
+trsf = predict(dummy, newdata=dados)
+
+##Criando as varáveis Dummy para o Bairro
+#Neib <- dados$Neighborhood
+#Neib <- data.frame(cont=c(Neib))
+#dummy <- dummyVars("~ .", data = Neib)
+#trsf <- data.frame(predict(dummy, newdata = Neib))
+
+
+## Concatenando as tabelas
+dados = cbind(dados, trsf) 
+
+##Elimina o campo Categórico
+dados$Neighborhood<-NULL
+dados$MSZoning<-NULL
+
+##Testando missing Values
+table(is.na(dados))
+
+head(dados)
+
+```
+
+```{r create corr matrix and coressponding p-value matrix}
+
+corr_mat <- round(cor(dados),2)
+p_mat <- cor_pmat(dados)
+
+# plotting the interactive corr heatmap
+corr_mat <- ggcorrplot(
+  corr_mat, 
+  hc.order = TRUE, 
+  type = "upper",
+  outline.col = "white",
+  p.mat = p_mat
+)
+
+ggplotly(corr_mat)
+
+```
+
+
+```{r }
+#Including Plots
+# creating correlation matrix
+corr_mat <- round(cor(dados))
+
+# reduce the size of correlation matrix
+melted_corr_mat <- melt(corr_mat)
+# head(melted_corr_mat)
+
+# plotting the correlation heatmap
+ggplot(data = melted_corr_mat, aes(x=Var1, y=Var2,fill=value)) +
+  geom_tile()+
+  geom_text(aes(Var2, Var1, label = value),
+            color = "black", size = 4)
+```
+
+##Modelagem
+
+## Backward stepwise regression
+
+```{r}
+#define intercept-only model
+intercept_only <- lm(SalePrice ~ 1, data=dados)
+
+#define model with all predictors
+all <- lm(SalePrice ~ ., data=dados)
+
+#perform backward stepwise regression
+backward <- stats::step(all, direction='backward', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+backward$anova
+```
+
+```{r}
+backward$coefficients
+```
+
+## Forward stepwise regression
+```{r}
+#define intercept-only model
+intercept_only <- lm(SalePrice ~ 1, data=dados)
+
+#define model with all predictors
+all <- lm(SalePrice ~ ., data=dados)
+
+#perform forward stepwise regression
+forward <- stats::step(intercept_only, direction='forward', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+forward$anova
+
+```
+
+```{r}
+forward$coefficients
+```
+
+## Both-direction stepwise regression
+```{r}
+#define intercept-only model
+intercept_only <- lm(SalePrice ~ 1, data=dados)
+
+#define model with all predictors
+all <- lm(SalePrice ~ ., data=dados)
+
+#perform both-direction stepwise regression
+both <- stats::step(intercept_only, direction='both', scope=formula(all), trace=0)
+
+#view results of backward stepwise regression
+both$anova
+```
+
+```{r}
+both$coefficients
+```
