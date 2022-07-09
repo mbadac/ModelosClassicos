@@ -1,0 +1,185 @@
+---
+title: "Regressão Linear - House Prices"
+author: "Alexandre Nordin, Cândido Silva e Daniela Bragança"
+date: '2022-07-05'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(dplyr)     # for data manipulation
+library(ggplot2)   # for awesome graphics
+
+
+# Modeling process packages
+library(rsample)    # for resampling procedures
+library(caret)     # for resampling and model training
+library(caTools)
+library(mlr3)
+library(corrgram)
+```
+
+## R Markdown
+
+Carregando e tratando os dados
+```{r houses data base treatment}
+
+## Importando o Dataset
+dataset = read.csv('train.csv', na.strings = "", stringsAsFactors = T)
+
+## Inspecionando as variáveis
+head(dataset)
+
+## Eliminando as variáveis não pré selecionadas com o intuito de diminuir o modelo do exercício
+dados <- subset(dataset, select = c(MSZoning, LotArea, Neighborhood, OverallQual, YearBuilt, YearRemodAdd,  FullBath, HalfBath,  BedroomAbvGr, KitchenAbvGr, GarageCars, PoolArea, MiscVal, SalePrice, firstFlrSF, secondFlrSF))
+
+head(dados)
+
+##Alguns campos fazem mais sentido se somados ou transfomedos em numéricos
+##Criando campos Agregados
+##Somando as áreas construidas do 1 e 2 andares
+dados["area"]<-dados$firstFlrSF + dados$secondFlrSF
+
+##Eliminando as vairáveis de 1 e 2 ANDAR
+dados$firstFlrSF<- NULL
+dados$secondFlrSF<-NULL
+
+##Criando a variável de Piscina, transformado a varável para se tem ou não piscina
+dados$Pool = as.numeric(dados$PoolArea > 0);
+##Eliminando a área da piscina
+dados$PoolArea<-NULL
+
+##Verifica as dimensões do data set
+dim(dados)
+
+##Verificando se existema NAs
+table(is.na(dados))
+
+```
+
+## Correlação
+
+Analisando correlações entre as Variáveis com o intuito de descobri quais as mais fortes a serem incluidas no modelo
+```{r Correlações}
+
+##mantendo apenas as variáveis numéricas para testar as relevancias
+dados_numericos <- subset(dados, select = -c(MSZoning, Neighborhood))
+correlacao=data.frame(cor(dados_numericos))
+correlacao
+
+##Separando as melhores correlações
+dados_numericos <- subset(dados, select = c(OverallQual, GarageCars, area, SalePrice))
+correlacao=data.frame(cor(dados_numericos))
+correlacao
+
+corrgram(dados_numericos, order=TRUE, lower.panel=panel.shade,
+         upper.panel=panel.pie, text.panel=panel.txt,
+         main="sale Price")
+
+
+
+```
+
+
+##Trabalhando com variaveis Dummy
+```{r Regressão}
+##Criando e Tratando varáveis Dummy para o Bairro
+summary(dados$Neighborhood)
+
+Neib <- dados$Neighborhood
+Neib <- data.frame(cont=c(Neib))
+
+dummy <- dummyVars("~ .", data = Neib)
+trsf <- data.frame(predict(dummy, newdata = Neib))
+
+##analisando a correlação com Sales Price
+trsf =cbind(trsf, dados_numericos)
+
+correlacao=data.frame(cor(trsf))
+correlacao
+
+##As Variáveis Dummy referentes a Bairro mostram uma correlação muito baixa, então não incluiremos no modelo
+
+##Criando e Tratando varáveis Dummy para o o Zonenamento
+summary(dados$MSZoning)
+
+Zon <- dados$MSZoning
+Zon <- data.frame(cont=c(Zon))
+
+dummy <- dummyVars("~ .", data = Zon)
+trsf <- data.frame(predict(dummy, newdata = Zon))
+
+##analisando a correlação com Sales Price
+trsf =cbind(trsf, dados_numericos)
+correlacao=data.frame(cor(trsf))
+correlacao
+
+##As Variáveis Dummy referentes a zoneamento mostram uma correlação muito baixa, então não incluiremos no modelo
+
+```
+
+## Testando as variáveis que ficaram no modelo
+
+```{r OverallQual}
+#OverallQual - Distribuição muito próxima da normal
+counts = table(dados_numericos$OverallQual)
+counts
+barplot(counts, main="OverallQual", xlab="OverallQual")
+
+#GarageCars - Distribuição muito próxima da normal
+counts = table(dados_numericos$GarageCars)
+counts
+barplot(counts, main="GarageCars", xlab="GarageCars")
+
+#area - Distribuição não normal
+counts = table(dados_numericos$area)
+#counts
+barplot(counts, main="area", xlab="area")
+```
+
+##Regressão Multipla 
+```{r }
+
+##Montagem do Modelo 
+modelo = lm(SalePrice ~ area, OverallQual, GarageCars, data=dados_numericos)
+modelo
+
+summary(modelo)$r.squared 
+summary(modelo)$adj.r.squared
+
+##Coeficiente de Determinação (25,3% da variavel dependente é explicada pelas variaveis explanatórias) R2 ajustado
+
+##Retirando a aéra do modelo
+modelo = lm(SalePrice ~ OverallQual, GarageCars, data=dados_numericos)
+modelo
+
+summary(modelo)$r.squared 
+summary(modelo)$adj.r.squared
+##Coeficiente de Determinação sobe para 85,7%, ,tendo uma melhora muito significativa no modelo
+
+```
+
+##Carregando a base de teste
+
+```{r }
+
+dtTest = read.csv('test.csv', na.strings = "", stringsAsFactors = T)
+
+##Inspecionando as variáveis
+head(dtTest)
+
+##Carregando as variaveis para a predição
+dtTest_features <- subset(dtTest, select = c(OverallQual, GarageCars))
+
+predicao =  predict(modelo, data.frame(dtTest_features))
+#predicao
+
+dtTest = data.frame(cbind(dtTest, predicao))
+
+write.csv(dtTest[, c("Id","predicao")], "resultado.csv", row.names=FALSE, quote=FALSE)
+
+```

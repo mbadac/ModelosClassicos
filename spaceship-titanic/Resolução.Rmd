@@ -1,5 +1,6 @@
 ---
-title: "Regressão Logistica - Spaceship Titanic"
+title: "Regressão Logística - Spaceship Titanic"
+author: "Alexandre Nordin, Cândido Silva e Daniela Bragança"
 output: html_document
 date: "`r Sys.Date()`"
 ---
@@ -24,26 +25,24 @@ library(mlbench)
 library(vip)       # variable importance
 ```
 
-# Base de dados para estudo
+# Importação da base de dados
 ```{r }
 dados = read.csv('train.csv', sep=',')
+test = read.csv('test.csv', sep=',')
 
 head(dados)
 ```
 
-# Análise Exploratória - Geral
-```{r }
+# Análise Exploratória
 
-```
-
-# Análise Exploratória - Geral
+## Verificação de nulos
 ```{r }
 summary(dados)
 
 dadosComNulos = dados[!complete.cases(dados),]
 head(dadosComNulos)
-#1073 observações contém dados nulos, ainda não serão removidas para análise individual
 ```
+8693 observações, da quais 1073 contém dados nulos. Não serão removidas para análise individual.
 
 ## Análise Exploratória - PassengerId
 ```{r }
@@ -61,21 +60,24 @@ PassengerId_temp = dados$PassengerId %>% str_split(pattern="_", simplify=TRUE)
 dados$PassengerId_Group = PassengerId_temp[, 1] %>% as.integer()
 dados$PassengerId_Num = PassengerId_temp[, 2] %>% as.integer()
 
+Test_PassengerId_temp = test$PassengerId %>% str_split(pattern="_", simplify=TRUE)
+test$PassengerId_Group = Test_PassengerId_temp[, 1] %>% as.integer()
+test$PassengerId_Num = Test_PassengerId_temp[, 2] %>% as.integer()
+
 # PassengerId_Group
-summary(dados$PassengerId_Group) #Valores inteiros variando de 1 a 9280
+summary(dados$PassengerId_Group) # Valores inteiros variando de 1 a 9280
 
 # PassengerId_Num
 counts = table(dados$PassengerId_Num)
-#   1    2    3    4    5    6    7    8 
-# 6217 1412  571  231  128   75   46   13 
 counts
+barplot(counts, main = "", xlab="Número do passageiro no grupo")
 
-barplot(counts, mais="Campo", xlab="Campo")
-
-#Drop do campo PassengerId completo
-dados = dados[, !colnames(all) %in% c("PassengerId")]
+dados = dados[, !colnames(dados) %in% c("PassengerId")]
+# dados = dados[, !colnames(dados) %in% c("PassengerId_Group")]
+# test = test[, !colnames(test) %in% c("PassengerId_Group")]
 
 ```
+PassengerId foi dividido em grupo e número, conforme explicada na documentação da base. O campo original foi dropado da base de treino, porém não pode ser dropado da base de teste, pois será usado na exportação. É possível perceber que os grupos são formados inicialmente com um componente. 
 
 ## Análise Exploratória - HomePlanet
 ```{r }
@@ -88,18 +90,23 @@ head(dados$HomePlanet)
 unique(dados$HomePlanet) # 4 valores possíveis: "Europa" "Earth"  "Mars" ""
 
 counts = table(dados$HomePlanet)
-# "" - 201    
-# Earth - 4602
-# Europa - 2131
-# Mars - 1759
 counts
 
+barplot(counts, main="", xlab="HomePlanet")
 
-barplot(counts, xlab="Campo")
+# Tratamento para que os passageiros sem anotação de planeta de origem sejam atribuídos ao mais frequente (Earth)
+dados[dados$HomePlanet == "",]$HomePlanet =  "Earth"
+test[test$HomePlanet == "",]$HomePlanet =  "Earth"
+
+dados$HomePlanet = factor(dados$HomePlanet)
+
+counts = table(dados$HomePlanet)
+counts
+barplot(counts, main="", xlab="HomePlanet")
 
 ```
 
-201 registros sem planeta de origem, com prevalência para Earth. Devido ao número de opções e falta de hierarquia entre elas, candidato a one-hot encoding.
+201 registros sem planeta de origem, que foram substituídos pelo mais frequente (Earth). Devido ao número de opções e falta de hierarquia entre elas, será usado one-hot encoding.
 
 ## Análise Exploratória - CryoSleep
 ```{r }
@@ -112,13 +119,19 @@ head(dados$CryoSleep)
 unique(dados$CryoSleep) # 3 valores possíveis, "" "True" "False" 
 
 counts = table(dados$CryoSleep)
-# "" - 217
-# False - 5439
-# True - 3037
 counts
+barplot(counts, xlab="CryoSleep")
 
-barplot(counts, xlab="Valor")
+# Convertendo valores para numérico e tratando os vazios
+dados$CryoSleep = as.integer(dados$CryoSleep == "True")
+test$CryoSleep = as.integer(test$CryoSleep == "True")
+
+counts = table(dados$CryoSleep)
+counts
+barplot(counts, xlab="CryoSleep")
 ```
+
+Considerando se tratar de um campo booleano, foi feito o tratamento para que os 217 campos nulos se tornem a classe prevalente (False) e sejam convertidos para 1 e 0.
 
 ## Análise Exploratória - Cabin
 ```{r }
@@ -134,38 +147,30 @@ dados$Cabin_Deck = cabin_temp[, 1] %>% as.factor()
 dados$Cabin_Num = cabin_temp[, 2] %>% as.integer()
 dados$Cabin_Side = cabin_temp[, 3] %>% str_replace(pattern="P", replace="Port") %>% str_replace(pattern="S", replace="StarBoard") %>% as.factor()
 
-# Valores possíveis: A B C D E F G T
-unique(dados$Cabin_Deck)
-counts = table(dados$Cabin_Deck)
-# NA - 199
-# A - 256
-# B - 779
-# C - 747
-# D - 478
-# E - 876
-# F - 2794
-# G - 2559
-# T - 5
-counts
+Test_cabin_temp = test$Cabin %>% str_split(pattern="/", simplify=TRUE)
+test$Cabin_Deck = Test_cabin_temp[, 1] %>% as.factor()
+test$Cabin_Num = Test_cabin_temp[, 2] %>% as.integer()
+test$Cabin_Side = Test_cabin_temp[, 3] %>% str_replace(pattern="P", replace="Port") %>% str_replace(pattern="S", replace="StarBoard") %>% as.factor()
 
+# Valores possíveis: A B C D E F G T
+counts = table(dados$Cabin_Deck)
+counts
 barplot(counts, mais="Campo", xlab="Valor")
 
 # Números de 0 a 1894, com 199 nulos
 summary(dados$Cabin_Num)
-unique(dados$Cabin_Num)
 
-# Valores possíveis: Port StarBoard
+# Valores possíveis: "", Port e StarBoard
 unique(dados$Cabin_Side)
 counts = table(dados$Cabin_Side)
-# NA - 199
-# Port - 4206
-# StarBoard - 4288
 counts
 barplot(counts, mais="Campo", xlab="Valor")
 
 #Drop do campo Cabin completo
 dados = dados[, !colnames(dados) %in% c("Cabin")]
+test = test[, !colnames(test) %in% c("Cabin")]
 ```
+Foram mantidos os valores vazios ("").
 
 ## Análise Exploratória - Destination
 ```{r }
@@ -175,29 +180,37 @@ summary(dados$Destination) # Campo de tipo character
 
 head(dados$Destination)
 
-unique(dados$Destination) # 4 valores possíveis "TRAPPIST-1e"   "PSO J318.5-22" "55 Cancri e" ""  
+unique(dados$Destination)
 
 # Substituição dos valores por algo mais fácil de lidar
 dados[dados$Destination == "PSO J318.5-22",]$Destination =  "P"
 dados[dados$Destination == "55 Cancri e",]$Destination =  "C"
 dados[dados$Destination == "TRAPPIST-1e",]$Destination =  "T"
 
+test[test$Destination == "PSO J318.5-22",]$Destination =  "P"
+test[test$Destination == "55 Cancri e",]$Destination =  "C"
+test[test$Destination == "TRAPPIST-1e",]$Destination =  "T"
+
 summary(dados$Destination)
 
 dados$Destination = factor(dados$Destination)
 
-# dados = dados %>% mutate(Destination_New = case_when( Destination == "PSO J318.5-22" ~ "P",
-# Destination == "55 Cancri e" ~ "C",
-# Destination == "TRAPPIST-1e" ~ "T",
-# ))
+counts = table(dados$Destination)
+counts
+barplot(counts, mais="", xlab="Destination")
+
+# Substituição dos destinos vazios pelo prevalente
+dados[dados$Destination == "",]$Destination =  "T"
+test[test$Destination == "",]$Destination =  "T"
+
+dados$Destination = factor(dados$Destination)
 
 counts = table(dados$Destination)
-#      ""       55 Cancri e PSO J318.5-22   TRAPPIST-1e 
-#      182          1800           796          5915 
 counts
-
-barplot(counts, mais="Campo", xlab="Valor")
+barplot(counts, mais="", xlab="Destination")
 ```
+
+São 3 planetas de destino, sendo que os registros vazios foram colocados no destino mais comum ("TRAPPIST-1e"). 
 
 ## Análise Exploratória - Age
 ```{r }
@@ -208,16 +221,24 @@ summary(dados$Age) # de 0 a 79, com 179 nulos
 head(dados$Age)
 
 counts = table(dados$Age)
-barplot(counts, mais="Campo", xlab="Valor")
+barplot(counts, mais="", xlab="Age")
 
 # Substituição dos nulos pela média das idades
 dados$Age = dados$Age %>% replace_na(mean(dados$Age, na.rm=TRUE))
+test$Age = test$Age %>% replace_na(mean(test$Age, na.rm=TRUE))
 
 summary(dados$Age) # de 0 a 79, sem nulos
 
 counts = table(dados$Age)
-barplot(counts, mais="Campo", xlab="Valor")
+barplot(counts, mais="", xlab="Age")
+
+ggplot(dados, aes(x=Transported, y=Age)) + geom_boxplot()
+
+#ggplot(dados, aes(x=Transported, y=Age, fill=Transported)) +
+    #theme(legend.position="none") +
+    #scale_fill_brewer(palette="Set1")
 ```
+Para os campos nulos, foi utilizada a média dos demais valores. Importante notar que há muitos registros com idade 0. Pelo bloxpot, não há diferença significativa nas idades das duas classes. 
 
 ## Análise Exploratória - VIP
 ```{r }
@@ -231,8 +252,18 @@ unique(dados$VIP)
 
 counts = table(dados$VIP)
 counts
-barplot(counts, mais="Campo", xlab="Valor")
+barplot(counts, mais="", xlab="VIP")
+
+dados$VIP = as.integer(dados$VIP == "True")
+test$VIP = as.integer(test$VIP == "True")
+
+counts = table(dados$VIP)
+counts
+barplot(counts, mais="", xlab="VIP")
 ```
+
+Considerando a prevalência do False e o fato te existirem campos com valor vazio, foi feito o preenchimento. 
+
 
 ## Análise Exploratória - RoomService
 ```{r }
@@ -243,7 +274,13 @@ head(dados$RoomService)
 
 # Substituição dos nulos por 0
 dados$RoomService = dados$RoomService %>% replace_na(0)
+test$RoomService = test$RoomService %>% replace_na(0)
+
+ggplot(dados, aes(x=Transported, y=RoomService)) + geom_boxplot()
+
 ```
+
+Feito o tratamento para valores nulos receberem 0. 
 
 ## Análise Exploratória - FoodCourt
 ```{r }
@@ -254,7 +291,12 @@ head(dados$FoodCourt)
 
 # Substituição dos nulos por 0
 dados$FoodCourt = dados$FoodCourt %>% replace_na(0)
+test$FoodCourt = test$FoodCourt %>% replace_na(0)
+
+ggplot(dados, aes(x=Transported, y=FoodCourt)) + geom_boxplot()
 ```
+
+Feito o tratamento para valores nulos receberem 0. 
 
 ## Análise Exploratória - ShoppingMall
 ```{r }
@@ -265,7 +307,12 @@ head(dados$ShoppingMall)
 
 # Substituição dos nulos por 0
 dados$ShoppingMall = dados$ShoppingMall %>% replace_na(0)
+test$ShoppingMall = test$ShoppingMall %>% replace_na(0)
+
+ggplot(dados, aes(x=Transported, y=ShoppingMall)) + geom_boxplot()
 ```
+
+Feito o tratamento para valores nulos receberem 0. 
 
 ## Análise Exploratória - Spa
 ```{r }
@@ -275,7 +322,12 @@ head(dados$Spa)
 
 # Substituição dos nulos por 0
 dados$Spa = dados$Spa %>% replace_na(0)
+test$Spa = test$Spa %>% replace_na(0)
+
+ggplot(dados, aes(x=Transported, y=Spa)) + geom_boxplot()
 ```
+
+Feito o tratamento para valores nulos receberem 0. 
 
 ## Análise Exploratória - VRDeck
 ```{r }
@@ -286,8 +338,13 @@ head(dados$VRDeck)
 
 # Substituição dos nulos por 0
 dados$VRDeck = dados$VRDeck %>% replace_na(0)
+test$VRDeck = test$VRDeck %>% replace_na(0)
+
+ggplot(dados, aes(x=Transported, y=VRDeck)) + geom_boxplot()
 
 ```
+
+Feito o tratamento para valores nulos receberem 0. 
 
 ## Análise Exploratória - Name
 ```{r }
@@ -297,7 +354,11 @@ summary(dados$Name)  #Campo de tipo character
 head(dados$Name) # Os nomes são campos exclusivos de cada passageiro
 
 dados = dados[, !colnames(dados) %in% c("Name")]
+test = test[, !colnames(test) %in% c("Name")]
 ```
+
+Como o campo é exclusivo de cada passageiro (tal qual sua chave) e, a princípio, não dá para identificar padrões como sexo, esse campo foi eliminado em ambas as bases (treino e teste). 
+
 
 ## Análise Exploratória - Transported
 ```{r }
@@ -311,60 +372,193 @@ unique(dados$Transported)
 
 counts = table(dados$Transported)
 counts
-barplot(counts, mais="Campo", xlab="Valor")
+barplot(counts, mais="", xlab="Transported")
+
+dados$Transported = as.integer(dados$Transported == "True")
 ```
 
-## Validação dos nulos
+Valores de target equilibrados para verdadeiro e falso.
+
+## One-hot encoding para HomePlanet, Destination, Cabin_Deck e Cabin_Side
 ```{r }
 encoder = dummyVars(~ HomePlanet + Destination + Cabin_Deck + Cabin_Side, data=dados, sep="") 
-dados = predict(encoder, newdata=dados)
-colnames(dados)[5:8] = c("Destination", "DestinationC", "DestinationP", "DestinationT")
-dados.dummy %>% head(3)
+dadosEncoded = predict(encoder, newdata=dados)
+dadosEncoded %>% head(3)
+
+testEncoded = predict(encoder, newdata=test)
+testEncoded %>% head(3)
+
+# Concatenação das tabelas
+dados = cbind(dados, dadosEncoded) 
+test = cbind(test, testEncoded)
 
 ```
 
-## Validação dos nulos
+## Remoção de colunas que não serão mais usadas
 ```{r }
-train_na = apply(all[!is.na(all$Transported),], MARGIN=2, function(x){sum(is.na(x))})
-test_na = apply(all[is.na(all$Transported),], MARGIN=2, function(x){sum(is.na(x))})
-temp = matrix(c(train_na, test_na), nrow=length(train_na), dimnames=list(names(train_na)))
-data.frame(Data=c("TRAIN", "TEST"), t(temp))
+dados = dados[, !colnames(dados) %in% c("HomePlanet", "Cabin_Deck", "Cabin_Side", "Destination", "Cabin_Num")]
+test = test[, !colnames(test) %in% c("HomePlanet", "Cabin_Deck", "Cabin_Side", "Destination", "Cabin_Num")]
 
 ```
+
+## Validação de nulos
+```{r }
+dadosComNulos = dados[!complete.cases(dados),]
+head(dadosComNulos)
+```
+Não existem mais registros com dados nulos.
 
 ## Matriz de Correlação
 ```{r }
-options(repr.plot.width=10, repr.plot.height=10)
-ggcorrplot(cor(train), hc.order=TRUE, outline.col="white", type="lower", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726"))
+corr = cor(dados)
+
+options(repr.plot.width=25, repr.plot.height=25)
+ggcorrplot(corr, tl.cex = 8)
 
 ```
 
-## Modelo
+Analisando a matriz, é possível verificar que os dados de Cabin_SideStarBoard e Cabin_SidePort não apresentam correção significativa com nenhuma outra coluna. O mesmo acontece com o PassengerId_Group, PassengerId_Num e Cabin_DeckT. 
+
+Além disso, é possível ver que algumas relações são mais contundentes para a variável target Transported. Para facilitar a visualização, as correlações mais altas identificadas visualmente serão quantificadas. 
+
+Algumas correlações que chamam a atenção no gráfico são facilmente entendíveis, já que, por exemplo, quando o destino é T, ele não é C, fazendo com que um seja a negação do outro. 
+
 ```{r }
-nfold = 4
-set.seed(0)
-cv.idx = split(sample(1:nrow(train)), 1:nfold)
-str(cv.idx)
+
+#Por este motivo, essas 4 colunas serão descartadas para uma nova análise, especialmente com o target.
+
+dados = dados[, !colnames(dados) %in% c("PassengerId_Group", "PassengerId_Num", "Cabin_DeckT", "Cabin_SideStarBoard", "Cabin_SidePort")]
+test = test[, !colnames(test) %in% c("PassengerId_Group", "PassengerId_Num", "Cabin_DeckT", "Cabin_SideStarBoard", "Cabin_SidePort")]
+
+corr = cor(dados)
+
+options(repr.plot.width=25, repr.plot.height=25)
+ggcorrplot(corr, tl.cex = 8)
+
+```
+
+Analisando novamente, é possível ver que algumas relações são mais contundentes para a variável target Transported. Para facilitar a visualização, as correlações mais altas identificadas visualmente serão quantificadas.
+
+```{r}
+cor(dados$CryoSleep, dados$Transported)
+cor(dados$RoomService, dados$Transported)
+cor(dados$Spa, dados$Transported)
+cor(dados$VRDeck, dados$Transported)
+
+```
+Ainda assim, as correlações são pouco significativas com a saída, sendo a maior entre Cryosleep, de 46%. Algumas correlações que chamam a atenção no gráfico são facilmente entendíveis, já que, por exemplo, quando o destino é T, ele não é C, fazendo com que um seja a negação do outro. 
+
+
+```{r, echo=FALSE} 
+# Método acessório
+avaliacao <- function(modelo, return){
+  print(summary(modelo))
+
+  print(exp(modelo$coefficients))
+  
+  y.pred.prob <- predict(modelo, type = "response")
+  #print(head(y.pred.prob))
+  
+  y.pred.class <- ifelse(y.pred.prob > 0.5, 1, 0)
+  #print(head(y.pred.class))
+  
+  confMatrix = table(y.pred.class, dados$Transported)
+  cat('Matriz de confusão:')
+  print(confMatrix)
+  
+  correct = sum(diag(confMatrix)) 
+  incorrect = sum(confMatrix)-sum(diag(confMatrix))
+  cat('Predições corretas: ', correct)
+  cat('\nPredições incorretas: ', incorrect)
+    
+  n = sum(confMatrix) # Número de instâncias
+  nc = nrow(confMatrix) # Número de classes
+  diag = diag(confMatrix) # Classificações corretas
+  rowsums = apply(confMatrix, 1, sum) # Instâncias por classe
+  colsums = apply(confMatrix, 2, sum) # Predições por classe
+
+  # Accuracy: (TP + FP) / n
+  accuracy = sum(diag) / n 
+  cat('\nAcurácia: ', accuracy)
+  
+  #Precision : TP / (TP+FP) 
+  precision = diag / colsums 
+  cat('\nPrecisão: ', precision)
+  
+  # Recall : TP / (TP+FN) 
+  recall = diag / rowsums 
+  cat('\nRecall: ', recall)
+  
+  # F1 Score : (2 * Precision * Recall) / (Precision+Recall)
+  f1 = 2 * precision * recall / (precision + recall) 
+  cat('\nF1 Score: ', f1)
+  
+  if(return==1)
+  {
+    return(y.pred.class)
+  }
+}
+```
+
+## Modelo com todas as colunas que permaneceram no df, sem padronização
+```{r}
+
+modelo1 <- glm(Transported ~ ., family = binomial, data = dados)
+pred1 = avaliacao(modelo1, 0)
+
+```
+
+## Modelo somente com as features mais relacionadas ao target, sem padronização
+```{r }
+
+modelo2 <- glm(Transported ~ CryoSleep + RoomService + Spa + VRDeck, family = binomial, data = dados)
+avaliacao(modelo2, 0)
+
+```
+
+## Padronização (entre 0 e 1)
+```{r}
+preproc1 <- preProcess(dados[,], method=c("range"))
+ 
+dadospad <- predict(preproc1, dados[,])
+
+head(dadospad)
+
+```
+
+## Modelo somente com todas as features, com padronização
+```{r}
+
+# Modelo somente com as features mais relacionadas ao target
+modelo3 <- glm(Transported ~ ., family = binomial, data = dadospad)
+avaliacao(modelo3, 0)
+
+```
+
+## Modelo somente com as features mais relacionadas ao target, com padronização
+```{r}
+
+# Modelo somente com as features mais relacionadas ao target
+modelo4 <- glm(Transported ~ CryoSleep + RoomService + Spa + VRDeck, family = binomial, data = dadospad)
+avaliacao(modelo4, 0)
 
 ```
 
 ## Análise dos resultados
+Foram desenvolvidos 4 modelos, sendo dois deles com todas as features da base e outros dois com somente as features mais relacionadas à variável dependente (Transported). Foram feitos, também, experimentos com as features escaladas (entre 0 e 1) e não escaladas, de forma que foi possível determinar o melhor modelo. Interessante notar que não foi percebida diferença alguma nas predições com as bases escalada e não escalada, demonstrando que, para este caso, não fez efeito.
+
+
+## Predição na base de testes
 ```{r }
 
-
+y.pred.prob.test <- predict(modelo1, newdata=test, type = "response")
+y.pred.class.test <- ifelse(y.pred.prob.test > 0.5, "True", "False")
+head(y.pred.class.test)
 ```
 
-### Verificação dos coeficientes
+## Salvamento do resultado (melhor modelo)
 ```{r }
-
-
-```
-
-## Salvamento do resultado
-```{r }
-sub = read.csv("../input/spaceship-titanic/sample_submission.csv")
-sub$Transported = sapply(pred, FUN=function(x){if (x==1){"True"} else {"False"}})
-write.csv(sub, "submission.csv", row.names=FALSE)
-sub %>% head(3)
+test$Transported = y.pred.class.test
+write.csv(test[, c("PassengerId","Transported")], "teste2.csv", row.names=FALSE, quote=FALSE)
 
 ```
